@@ -1,0 +1,59 @@
+# ============================
+# Gradle
+# ============================
+.gradle/
+.cg/
+/build/
+/app/build/
+build/
+*.apk
+*.aab
+*.ap_
+*.aar
+*.dex
+
+# ============================
+# Local configuration (machine/IDE specific)
+# ============================
+local.properties
+
+# ============================
+# Firma / credenciales sensibles
+# NUNCA deben subirse al repositorio
+# ============================
+release.properties
+*.keystore
+*.jks
+
+# ============================
+# Logs
+# ============================
+*.log
+
+# ============================
+# IntelliJ / Android Studio (por si CodeOnTheGo genera algo similar)
+# ============================
+*.iml
+.idea/
+captures/
+.navigation/
+
+# ============================
+# Native build (no aplica hoy, pero por si se agrega NDK/CMake)
+# ============================
+.externalNativeBuild/
+.cxx/
+
+# ============================
+# Otros generados
+# ============================
+/bin/
+/gen/
+/out/
+proguard/
+
+# ============================
+# Sistema operativo
+# ============================
+.DS_Store
+Thumbs.db
