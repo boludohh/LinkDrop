@@ -3,6 +3,8 @@ package com.linkdrop.smartphone.network
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
+import android.text.format.Formatter
 import android.util.Log
 import com.linkdrop.smartphone.network.model.NetworkDevice
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +25,8 @@ import java.net.InetAddress
  * Esta clase no realiza transferencias de archivos ni maneja sockets: esa
  * responsabilidad corresponde a los managers de la Fase 2 (ServerSocket / Socket).
  *
- * @param context Contexto de la aplicación, usado únicamente para obtener el [NsdManager] del sistema.
+ * @param context Contexto de la aplicación, usado para obtener el [NsdManager] del
+ *                sistema y la dirección IP local del dispositivo.
  * @param localDeviceName Nombre que se anunciará en la red para identificar este dispositivo.
  * @param localServicePort Puerto TCP en el que este dispositivo escuchará conexiones entrantes.
  */
@@ -117,8 +120,11 @@ class NsdDiscoveryManager(
      * Inicia la búsqueda activa de otros dispositivos LinkDrop en la red local.
      *
      * Los dispositivos encontrados se resuelven automáticamente (host y puerto)
-     * y se agregan a [discoveredDevices]. Es seguro llamar a este método una sola
-     * vez por sesión de uso; para reiniciar la búsqueda primero debe llamarse a [stopDiscovery].
+     * y se agregan a [discoveredDevices]. El propio dispositivo se descarta comparando
+     * su dirección IP local, no su nombre, ya que el nombre registrado puede no
+     * confirmarse todavía en el momento en que se recibe el primer resultado.
+     * Es seguro llamar a este método una sola vez por sesión de uso; para reiniciar
+     * la búsqueda primero debe llamarse a [stopDiscovery].
      */
     fun startDiscovery() {
         if (discoveryListener != null) {
@@ -132,10 +138,6 @@ class NsdDiscoveryManager(
             }
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
-                // Se ignora el propio servicio publicado para no listarse a sí mismo.
-                if (serviceInfo.serviceName == registeredServiceName) {
-                    return
-                }
                 resolveService(serviceInfo)
             }
 
@@ -179,7 +181,9 @@ class NsdDiscoveryManager(
 
     /**
      * Resuelve la información de conexión (host y puerto) de un servicio encontrado
-     * durante el descubrimiento, y lo agrega a la lista observable si la resolución es exitosa.
+     * durante el descubrimiento. Si la dirección resuelta coincide con la IP local
+     * de este dispositivo, el resultado se descarta por tratarse del propio servicio
+     * publicado. En caso contrario, se agrega a la lista observable.
      */
     private fun resolveService(serviceInfo: NsdServiceInfo) {
         nsdManager.resolveService(serviceInfo, object : NsdManager.ResolveListener {
@@ -192,6 +196,12 @@ class NsdDiscoveryManager(
 
             override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
                 val resolvedHost: InetAddress = serviceInfo.host ?: return
+
+                if (isLocalDeviceAddress(resolvedHost)) {
+                    Log.i(TAG, "Se descarta el propio servicio publicado (IP local: ${resolvedHost.hostAddress})")
+                    return
+                }
+
                 val device = NetworkDevice(
                     serviceName = serviceInfo.serviceName,
                     host = resolvedHost,
@@ -200,6 +210,32 @@ class NsdDiscoveryManager(
                 addOrUpdateDevice(device)
             }
         })
+    }
+
+    /**
+     * Determina si la dirección [candidateHost] corresponde a la propia IP local
+     * del dispositivo dentro de la red Wi-Fi actual.
+     */
+    private fun isLocalDeviceAddress(candidateHost: InetAddress): Boolean {
+        val localIpAddress = getLocalIpAddress() ?: return false
+        return candidateHost.hostAddress == localIpAddress
+    }
+
+    /**
+     * Obtiene la dirección IP local del dispositivo dentro de la red Wi-Fi actual,
+     * utilizando el [WifiManager] del sistema.
+     */
+    private fun getLocalIpAddress(): String? {
+        return runCatching {
+            val wifiManager = context.applicationContext
+                .getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val ipInt = wifiManager.connectionInfo?.ipAddress ?: return null
+            if (ipInt == 0) return null
+            Formatter.formatIpAddress(ipInt)
+        }.getOrElse {
+            Log.w(TAG, "No se pudo obtener la IP local del dispositivo", it)
+            null
+        }
     }
 
     private fun addOrUpdateDevice(device: NetworkDevice) {
