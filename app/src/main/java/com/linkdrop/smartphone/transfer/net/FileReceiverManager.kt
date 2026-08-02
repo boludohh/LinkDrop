@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.net.ServerSocket
 import java.net.Socket
 
@@ -23,8 +25,14 @@ import java.net.Socket
  * Abre un [ServerSocket] en el puerto fijo indicado y queda a la espera de
  * conexiones entrantes. Al recibir una conexión, lee primero un pequeño
  * encabezado con el nombre del dispositivo remoto, el nombre del archivo y su
- * tamaño en bytes, y luego escribe el contenido recibido en la carpeta
- * pública `Download/LinkDrop/` mediante [LinkDropFileStorage].
+ * tamaño en bytes, y consulta [onIncomingFileRequest] para decidir si aceptar
+ * o rechazar la transferencia antes de recibir ningún byte del archivo. Si
+ * se acepta, escribe el contenido recibido en la carpeta pública
+ * `Download/LinkDrop/` mediante [LinkDropFileStorage].
+ *
+ * Las conexiones entrantes se procesan de a una por vez; si llega una nueva
+ * conexión mientras ya hay una transferencia en curso, se rechaza de inmediato
+ * sin consultar [onIncomingFileRequest].
  *
  * Esta clase no realiza descubrimiento de dispositivos ni envía archivos:
  * esas responsabilidades corresponden a [com.linkdrop.smartphone.network.NsdDiscoveryManager]
@@ -32,10 +40,17 @@ import java.net.Socket
  *
  * @param context Contexto de la aplicación, usado para acceder al almacenamiento de destino.
  * @param listenPort Puerto TCP en el que este dispositivo escuchará conexiones entrantes.
+ * @param onIncomingFileRequest Función invocada por cada archivo entrante para decidir
+ *                               si se acepta o se rechaza, recibiendo el nombre del
+ *                               dispositivo remoto y el nombre del archivo propuesto.
+ *                               Devuelve `true` para aceptar la transferencia. Por
+ *                               defecto acepta siempre, ya que todavía no existe una
+ *                               pantalla de confirmación real para el usuario.
  */
 class FileReceiverManager(
     private val context: Context,
-    private val listenPort: Int
+    private val listenPort: Int,
+    private val onIncomingFileRequest: suspend (remoteDeviceName: String, fileName: String) -> Boolean = { _, _ -> true }
 ) {
 
     companion object {
@@ -106,19 +121,64 @@ class FileReceiverManager(
     }
 
     /**
-     * Procesa una conexión entrante completa: lee el encabezado con los
-     * metadatos del archivo y luego su contenido, escribiéndolo en el
-     * almacenamiento de destino mientras reporta el progreso.
+     * Procesa una conexión entrante completa: primero verifica que no haya
+     * otra transferencia en curso, luego lee el encabezado con los metadatos
+     * del archivo, consulta [onIncomingFileRequest] para decidir si aceptar,
+     * responde esa decisión al emisor, y en caso afirmativo recibe el
+     * contenido del archivo escribiéndolo en el almacenamiento de destino
+     * mientras reporta el progreso.
+     *
+     * Esta función es `suspend` porque [onIncomingFileRequest] puede
+     * necesitar esperar una interacción del usuario (por ejemplo, tocar un
+     * botón de aceptar/rechazar en un diálogo) antes de continuar.
+     *
+     * Si ya existe una transferencia en curso, la conexión se rechaza
+     * inmediatamente sin leer ni procesar nada, para evitar que dos
+     * transferencias se ejecuten al mismo tiempo sobre este dispositivo.
      */
-    private fun handleIncomingConnection(clientSocket: Socket) {
+    private suspend fun handleIncomingConnection(clientSocket: Socket) {
         clientSocket.use { socket ->
-            runCatching {
-                val input = DataInputStream(BufferedInputStream(socket.getInputStream()))
+            if (_transferProgress.value is TransferProgress.InProgress) {
+                Log.w(TAG, "Conexión entrante rechazada: ya hay una transferencia en curso")
+                return
+            }
 
+            val input = DataInputStream(BufferedInputStream(socket.getInputStream()))
+            val output = DataOutputStream(BufferedOutputStream(socket.getOutputStream()))
+
+            // La lectura del encabezado se separa en su propio runCatching porque,
+            // si falla, no hay ningún archivo identificado todavía sobre el cual
+            // reportar un estado Failed con sentido.
+            val headerResult = runCatching {
                 val remoteDeviceName = input.readUTF()
                 val fileName = input.readUTF()
                 val fileSize = input.readLong()
+                Triple(remoteDeviceName, fileName, fileSize)
+            }
 
+            val (remoteDeviceName, fileName, fileSize) = headerResult.getOrElse { error ->
+                Log.e(TAG, "Error al leer el encabezado de la transferencia entrante", error)
+                return
+            }
+
+            // La consulta de aceptación queda fuera de runCatching porque es una
+            // función suspend y runCatching no admite lambdas suspend.
+            val isAccepted = onIncomingFileRequest(remoteDeviceName, fileName)
+
+            runCatching {
+                output.writeBoolean(isAccepted)
+                output.flush()
+            }.onFailure { error ->
+                Log.e(TAG, "Error al responder la confirmación al emisor", error)
+                return
+            }
+
+            if (!isAccepted) {
+                Log.i(TAG, "Transferencia de '$fileName' rechazada")
+                return
+            }
+
+            runCatching {
                 _transferProgress.value = TransferProgress.InProgress(
                     fileName = fileName,
                     totalBytes = fileSize,
@@ -130,7 +190,7 @@ class FileReceiverManager(
                 val outputStream = fileStorage.createOutputStreamFor(fileName, GENERIC_MIME_TYPE)
                     ?: throw IllegalStateException("No se pudo crear el archivo de destino")
 
-                outputStream.use { output ->
+                outputStream.use { fileOutput ->
                     val buffer = ByteArray(BUFFER_SIZE)
                     var totalRead = 0L
 
@@ -138,7 +198,7 @@ class FileReceiverManager(
                         val read = input.read(buffer, 0, buffer.size)
                         if (read == -1) break
 
-                        output.write(buffer, 0, read)
+                        fileOutput.write(buffer, 0, read)
                         totalRead += read
 
                         _transferProgress.value = TransferProgress.InProgress(
@@ -161,10 +221,8 @@ class FileReceiverManager(
                 Log.i(TAG, "Archivo '$fileName' recibido correctamente ($fileSize bytes)")
             }.onFailure { error ->
                 Log.e(TAG, "Error al recibir el archivo", error)
-                val currentState = _transferProgress.value
-                val fileNameForError = (currentState as? TransferProgress.InProgress)?.fileName ?: "archivo"
                 _transferProgress.value = TransferProgress.Failed(
-                    fileName = fileNameForError,
+                    fileName = fileName,
                     reason = error.message ?: "Error desconocido durante la recepción"
                 )
             }

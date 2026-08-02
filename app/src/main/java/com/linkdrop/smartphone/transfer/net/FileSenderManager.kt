@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
+import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.Socket
 
@@ -23,8 +25,10 @@ import java.net.Socket
  *
  * Se conecta al [NetworkDevice] destino, envía primero un pequeño encabezado
  * con el nombre de este dispositivo, el nombre del archivo y su tamaño en
- * bytes, y luego transmite el contenido leído desde el [Uri] del archivo
- * seleccionado por el usuario.
+ * bytes, y espera la confirmación del receptor antes de transmitir el
+ * contenido. Si el receptor rechaza la transferencia (o no responde), la
+ * operación finaliza con [TransferProgress.Failed] sin enviar ningún byte
+ * del archivo.
  *
  * Esta clase no realiza descubrimiento de dispositivos ni recibe archivos:
  * esas responsabilidades corresponden a [com.linkdrop.smartphone.network.NsdDiscoveryManager]
@@ -90,15 +94,22 @@ class FileSenderManager(
                     output.writeLong(fileSize)
                     output.flush()
 
-                    val inputStream = context.contentResolver.openInputStream(fileUri)
+                    val input = DataInputStream(BufferedInputStream(socket.getInputStream()))
+                    val wasAccepted = input.readBoolean()
+
+                    if (!wasAccepted) {
+                        throw IllegalStateException("El destinatario rechazó la transferencia")
+                    }
+
+                    val fileInputStream = context.contentResolver.openInputStream(fileUri)
                         ?: throw IllegalStateException("No se pudo abrir el archivo seleccionado")
 
-                    inputStream.use { input ->
+                    fileInputStream.use { fileInput ->
                         val buffer = ByteArray(BUFFER_SIZE)
                         var totalSent = 0L
                         var read: Int
 
-                        while (input.read(buffer).also { read = it } != -1) {
+                        while (fileInput.read(buffer).also { read = it } != -1) {
                             output.write(buffer, 0, read)
                             totalSent += read
 
@@ -159,4 +170,4 @@ class FileSenderManager(
 
         return fileName to fileSize
     }
-}  
+}
