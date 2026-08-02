@@ -133,4 +133,5 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
 
     implementation(libs.kotlin.stdlib)
+    implementation(libs.androidx.datastore.preferences)
 }

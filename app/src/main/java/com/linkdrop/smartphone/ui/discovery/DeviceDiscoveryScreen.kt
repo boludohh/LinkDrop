@@ -4,27 +4,38 @@ import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.linkdrop.smartphone.network.NsdDiscoveryManager
 import com.linkdrop.smartphone.network.model.NetworkDevice
 import com.linkdrop.smartphone.network.util.resolveLocalDeviceName
+import com.linkdrop.smartphone.settings.DeviceNameRepository
 import com.linkdrop.smartphone.transfer.model.TransferProgress
 import com.linkdrop.smartphone.transfer.net.FileReceiverManager
 import com.linkdrop.smartphone.transfer.net.FileSenderManager
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /** Puerto fijo en el que este dispositivo escucha conexiones entrantes. */
 private const val LOCAL_SERVICE_PORT = 53317
@@ -35,6 +46,9 @@ private const val LOCAL_SERVICE_PORT = 53317
  *
  * Al tocar un dispositivo de la lista se abre el selector de archivos del
  * sistema; el archivo elegido se envía automáticamente a ese dispositivo.
+ * Incluye además un campo de texto temporal para validar el guardado del
+ * nombre personalizado en DataStore, previo a la existencia de la pantalla
+ * de Ajustes definitiva.
  * Sin estilos definitivos: este archivo será reemplazado por completo cuando
  * se implemente la interfaz final de la Home.
  *
@@ -48,20 +62,42 @@ fun DeviceDiscoveryScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val localDeviceName = remember { resolveLocalDeviceName() }
+    val deviceNameRepository = remember { DeviceNameRepository(context) }
+    val coroutineScope = rememberCoroutineScope()
 
-    val discoveryManager = remember {
+    // El nombre local puede tardar un instante en resolverse porque primero
+    // se consulta si el usuario definió un nombre personalizado en DataStore.
+    // Mientras tanto, localDeviceName permanece en null y no se publica ni
+    // se descubre nada, para evitar registrar el servicio con un nombre incorrecto.
+    var localDeviceName by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        val customName = deviceNameRepository.customDeviceName.first()
+        localDeviceName = customName ?: resolveLocalDeviceName()
+    }
+
+    val resolvedName = localDeviceName
+    if (resolvedName == null) {
+        Column(
+            modifier = modifier.fillMaxSize().padding(16.dp)
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    val discoveryManager = remember(resolvedName) {
         NsdDiscoveryManager(
             context = context,
-            localDeviceName = localDeviceName,
+            localDeviceName = resolvedName,
             localServicePort = LOCAL_SERVICE_PORT
         )
     }
 
-    val senderManager = remember {
+    val senderManager = remember(resolvedName) {
         FileSenderManager(
             context = context,
-            localDeviceName = localDeviceName
+            localDeviceName = resolvedName
         )
     }
 
@@ -76,7 +112,7 @@ fun DeviceDiscoveryScreen(
     val sendProgress by senderManager.transferProgress.collectAsState()
     val receiveProgress by receiverManager.transferProgress.collectAsState()
 
-    DisposableEffect(Unit) {
+    DisposableEffect(resolvedName) {
         discoveryManager.startPublishing()
         discoveryManager.startDiscovery()
         receiverManager.startListening()
@@ -88,8 +124,34 @@ fun DeviceDiscoveryScreen(
         }
     }
 
+    var nameInput by remember(resolvedName) { mutableStateOf(resolvedName) }
+
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
-        Text(text = "Dispositivo local: $localDeviceName")
+        Text(text = "Nombre personalizado (prueba de DataStore)")
+        Row(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = nameInput,
+                onValueChange = { nameInput = it },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            Button(
+                onClick = {
+                    coroutineScope.launch {
+                        deviceNameRepository.setCustomDeviceName(nameInput)
+                        val customName = deviceNameRepository.customDeviceName.first()
+                        localDeviceName = customName ?: resolveLocalDeviceName()
+                    }
+                },
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
+                Text(text = "Guardar")
+            }
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        Text(text = "Dispositivo local: $resolvedName")
 
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 

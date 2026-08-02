@@ -13,6 +13,7 @@ composeUiVersion = "1.9.0"
 material3Version = "1.4.0"
 uiToolingPreviewAndroid = "1.9.0"
 collectionVersion = "1.5.0"
+datastorePreferences = "1.2.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -53,6 +54,8 @@ collection-ktx = { group = "androidx.collection", name = "collection-ktx", versi
 
 
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
+
+androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
 
 
 [plugins]
