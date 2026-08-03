@@ -6,14 +6,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
 import com.linkdrop.smartphone.settings.LocaleRepository
-import com.linkdrop.smartphone.ui.discovery.DeviceDiscoveryScreen
+import com.linkdrop.smartphone.ui.LinkDropRoot
 import com.linkdrop.smartphone.ui.theme.LinkDropTheme
 import com.linkdrop.smartphone.util.applyAppLocale
 import kotlinx.coroutines.flow.first
@@ -66,18 +60,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             LinkDropTheme {
-                Scaffold { innerPadding ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
-                        color = MaterialTheme.colorScheme.background
-                    ) {
-                        DeviceDiscoveryScreen(
-                            onPickFile = ::launchFilePicker
-                        )
-                    }
-                }
+                LinkDropRoot(onPickFile = ::launchFilePicker)
             }
         }
     }

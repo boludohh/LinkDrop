@@ -16,37 +16,38 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.EOFException
 import java.net.ServerSocket
 import java.net.Socket
 
 /**
  * Encargado exclusivo de recibir archivos enviados por otros dispositivos LinkDrop.
  *
- * Abre un [ServerSocket] en el puerto fijo indicado y queda a la espera de
+ * Abre un \[ServerSocket\] en el puerto fijo indicado y queda a la espera de
  * conexiones entrantes. Al recibir una conexión, lee primero un pequeño
  * encabezado con el nombre del dispositivo remoto, el nombre del archivo y su
- * tamaño en bytes, y consulta [onIncomingFileRequest] para decidir si aceptar
+ * tamaño en bytes, y consulta \[onIncomingFileRequest\] para decidir si aceptar
  * o rechazar la transferencia antes de recibir ningún byte del archivo. Si
  * se acepta, escribe el contenido recibido en la carpeta pública
- * `Download/LinkDrop/` mediante [LinkDropFileStorage].
+ * \`Download/LinkDrop/\` mediante \[LinkDropFileStorage\].
  *
  * Las conexiones entrantes se procesan de a una por vez; si llega una nueva
  * conexión mientras ya hay una transferencia en curso, se rechaza de inmediato
- * sin consultar [onIncomingFileRequest].
+ * sin consultar \[onIncomingFileRequest\].
  *
  * Esta clase no realiza descubrimiento de dispositivos ni envía archivos:
- * esas responsabilidades corresponden a [com.linkdrop.smartphone.network.NsdDiscoveryManager]
+ * esas responsabilidades corresponden a \[com.linkdrop.smartphone.network.NsdDiscoveryManager\]
  * y al manager del lado cliente respectivamente.
  *
  * @param context Contexto de la aplicación, usado para acceder al almacenamiento de destino.
  * @param listenPort Puerto TCP en el que este dispositivo escuchará conexiones entrantes.
  * @param onIncomingFileRequest Función invocada por cada archivo entrante para decidir
- *                               si se acepta o se rechaza, recibiendo el nombre del
- *                               dispositivo remoto y el nombre del archivo propuesto.
- *                               Devuelve `true` para aceptar la transferencia. Por
- *                               defecto acepta siempre, ya que todavía no existe una
- *                               pantalla de confirmación real para el usuario.
- */
+ * si se acepta o se rechaza, recibiendo el nombre del
+ * dispositivo remoto y el nombre del archivo propuesto.
+ * Devuelve \`true\` para aceptar la transferencia. Por
+ * defecto acepta siempre, ya que todavía no existe una
+ * pantalla de confirmación real para el usuario.
+ \*/
 class FileReceiverManager(
     private val context: Context,
     private val listenPort: Int,
@@ -56,10 +57,10 @@ class FileReceiverManager(
     companion object {
         private const val TAG = "FileReceiverManager"
 
-        /** Tamaño del búfer de lectura/escritura, en bytes. */
+        /** Tamaño del búfer de lectura/escritura, en bytes. \*/
         private const val BUFFER_SIZE = 8192
 
-        /** Tipo MIME genérico usado cuando no se conoce el tipo real del archivo. */
+        /** Tipo MIME genérico usado cuando no se conoce el tipo real del archivo. \*/
         private const val GENERIC_MIME_TYPE = "application/octet-stream"
     }
 
@@ -71,7 +72,7 @@ class FileReceiverManager(
 
     private val _transferProgress = MutableStateFlow<TransferProgress>(TransferProgress.Idle)
 
-    /** Estado observable de la transferencia de recepción actual. */
+    /** Estado observable de la transferencia de recepción actual. \*/
     val transferProgress: StateFlow<TransferProgress> = _transferProgress.asStateFlow()
 
     /**
@@ -79,8 +80,8 @@ class FileReceiverManager(
      *
      * Por cada conexión aceptada se procesa una única transferencia de archivo.
      * Al finalizar (con éxito o con error), el servidor vuelve a quedar a la
-     * espera de una nueva conexión mientras [stopListening] no sea invocado.
-     */
+     * espera de una nueva conexión mientras \[stopListening\] no sea invocado.
+     \*/
     fun startListening() {
         if (listeningJob != null) {
             Log.w(TAG, "El servidor ya está escuchando, se ignora la nueva solicitud")
@@ -107,7 +108,7 @@ class FileReceiverManager(
     /**
      * Detiene la escucha de conexiones entrantes y libera el puerto utilizado.
      * Debe llamarse cuando la app pasa a segundo plano o se cierra.
-     */
+     \*/
     fun stopListening() {
         runCatching {
             serverSocket?.close()
@@ -123,19 +124,19 @@ class FileReceiverManager(
     /**
      * Procesa una conexión entrante completa: primero verifica que no haya
      * otra transferencia en curso, luego lee el encabezado con los metadatos
-     * del archivo, consulta [onIncomingFileRequest] para decidir si aceptar,
+     * del archivo, consulta \[onIncomingFileRequest\] para decidir si aceptar,
      * responde esa decisión al emisor, y en caso afirmativo recibe el
      * contenido del archivo escribiéndolo en el almacenamiento de destino
      * mientras reporta el progreso.
      *
-     * Esta función es `suspend` porque [onIncomingFileRequest] puede
+     * Esta función es \`suspend\` porque \[onIncomingFileRequest\] puede
      * necesitar esperar una interacción del usuario (por ejemplo, tocar un
      * botón de aceptar/rechazar en un diálogo) antes de continuar.
      *
      * Si ya existe una transferencia en curso, la conexión se rechaza
      * inmediatamente sin leer ni procesar nada, para evitar que dos
      * transferencias se ejecuten al mismo tiempo sobre este dispositivo.
-     */
+     \*/
     private suspend fun handleIncomingConnection(clientSocket: Socket) {
         clientSocket.use { socket ->
             if (_transferProgress.value is TransferProgress.InProgress) {
@@ -157,7 +158,14 @@ class FileReceiverManager(
             }
 
             val (remoteDeviceName, fileName, fileSize) = headerResult.getOrElse { error ->
-                Log.e(TAG, "Error al leer el encabezado de la transferencia entrante", error)
+                if (error is EOFException) {
+                    // Conexión cerrada sin enviar datos: corresponde a las sondas
+                    // de disponibilidad de otros dispositivos o a conexiones
+                    // abortadas antes del encabezado. No es un error real.
+                    Log.d(TAG, "Conexión entrante cerrada sin enviar el encabezado")
+                } else {
+                    Log.e(TAG, "Error al leer el encabezado de la transferencia entrante", error)
+                }
                 return
             }
 

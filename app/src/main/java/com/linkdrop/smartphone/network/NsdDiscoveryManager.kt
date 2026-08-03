@@ -19,21 +19,21 @@ import java.net.InetAddress
  *
  * Responsabilidades:
  * - Publicar (registrar) este dispositivo como un servicio LinkDrop visible para otros,
- *   incluyendo su tipo de dispositivo como metadata interna (para el ícono en la interfaz).
+ *   anunciando además su tipo de dispositivo como metadata del servicio.
  * - Descubrir otros dispositivos LinkDrop presentes en la misma red Wi-Fi.
- * - Exponer la lista de dispositivos encontrados como [StateFlow] para que la UI
+ * - Exponer la lista de dispositivos encontrados como \[StateFlow\] para que la UI
  *   la observe de forma reactiva.
  *
  * Esta clase no realiza transferencias de archivos ni maneja sockets: esa
  * responsabilidad corresponde a los managers de la Fase 2 (ServerSocket / Socket).
  *
- * @param context Contexto de la aplicación, usado para obtener el [NsdManager] del
- *                sistema y la dirección IP local del dispositivo.
+ * @param context Contexto de la aplicación, usado para obtener el \[NsdManager\] del
+ * sistema y la dirección IP local del dispositivo.
  * @param localDeviceName Nombre que se anunciará en la red para identificar este dispositivo.
  * @param localServicePort Puerto TCP en el que este dispositivo escuchará conexiones entrantes.
- * @param localDeviceType Tipo de este dispositivo (teléfono, tablet o TV), anunciado como
- *                         metadata interna para que otros dispositivos elijan el ícono correcto.
- */
+ * @param localDeviceType Tipo de este dispositivo, anunciado en la red para que
+ * los remotos elijan el icono representativo correcto.
+ \*/
 class NsdDiscoveryManager(
     private val context: Context,
     private val localDeviceName: String,
@@ -44,11 +44,11 @@ class NsdDiscoveryManager(
     companion object {
         private const val TAG = "NsdDiscoveryManager"
 
-        /** Tipo de servicio NSD reservado para la identificación de dispositivos LinkDrop. */
+        /** Tipo de servicio NSD reservado para la identificación de dispositivos LinkDrop. \*/
         const val SERVICE_TYPE = "_linkdrop._tcp."
 
-        /** Clave del atributo NSD (TXT record) que transporta el tipo de dispositivo. */
-        private const val TXT_RECORD_DEVICE_TYPE_KEY = "deviceType"
+        /** Clave del atributo NSD (registro TXT) que transporta el tipo de dispositivo. \*/
+        private const val DEVICE_TYPE_ATTRIBUTE = "device_type"
     }
 
     private val nsdManager: NsdManager by lazy {
@@ -58,12 +58,12 @@ class NsdDiscoveryManager(
     private var registrationListener: NsdManager.RegistrationListener? = null
     private var discoveryListener: NsdManager.DiscoveryListener? = null
 
-    /** Nombre real bajo el cual quedó registrado el servicio (puede variar si hubo colisión de nombres). */
+    /** Nombre real bajo el cual quedó registrado el servicio (puede variar si hubo colisión de nombres). \*/
     private var registeredServiceName: String? = null
 
     private val _discoveredDevices = MutableStateFlow<List<NetworkDevice>>(emptyList())
 
-    /** Lista observable de dispositivos LinkDrop actualmente visibles en la red. */
+    /** Lista observable de dispositivos LinkDrop actualmente visibles en la red. \*/
     val discoveredDevices: StateFlow<List<NetworkDevice>> = _discoveredDevices.asStateFlow()
 
     /**
@@ -71,8 +71,8 @@ class NsdDiscoveryManager(
      * puedan encontrarlo mediante descubrimiento NSD.
      *
      * Es seguro llamar a este método una sola vez por sesión de uso; para volver a
-     * registrar el servicio primero debe llamarse a [stopPublishing].
-     */
+     * registrar el servicio primero debe llamarse a \[stopPublishing\].
+     \*/
     fun startPublishing() {
         if (registrationListener != null) {
             Log.w(TAG, "El servicio ya está siendo publicado, se ignora la nueva solicitud")
@@ -83,7 +83,7 @@ class NsdDiscoveryManager(
             serviceName = localDeviceName
             serviceType = SERVICE_TYPE
             port = localServicePort
-            setAttribute(TXT_RECORD_DEVICE_TYPE_KEY, localDeviceType.name)
+            setAttribute(DEVICE_TYPE_ATTRIBUTE, localDeviceType.name)
         }
 
         val listener = object : NsdManager.RegistrationListener {
@@ -114,7 +114,7 @@ class NsdDiscoveryManager(
     /**
      * Detiene la publicación de este dispositivo en la red. Debe llamarse cuando
      * la app pasa a segundo plano o se cierra, para no permanecer visible innecesariamente.
-     */
+     \*/
     fun stopPublishing() {
         val listener = registrationListener ?: return
         runCatching {
@@ -128,13 +128,13 @@ class NsdDiscoveryManager(
     /**
      * Inicia la búsqueda activa de otros dispositivos LinkDrop en la red local.
      *
-     * Los dispositivos encontrados se resuelven automáticamente (host, puerto y tipo
-     * de dispositivo) y se agregan a [discoveredDevices]. El propio dispositivo se
-     * descarta comparando su dirección IP local, no su nombre, ya que el nombre
-     * registrado puede no confirmarse todavía en el momento en que se recibe el
-     * primer resultado. Es seguro llamar a este método una sola vez por sesión de
-     * uso; para reiniciar la búsqueda primero debe llamarse a [stopDiscovery].
-     */
+     * Los dispositivos encontrados se resuelven automáticamente (host, puerto y tipo)
+     * y se agregan a \[discoveredDevices\]. El propio dispositivo se descarta comparando
+     * su dirección IP local, no su nombre, ya que el nombre registrado puede no
+     * confirmarse todavía en el momento en que se recibe el primer resultado.
+     * Es seguro llamar a este método una sola vez por sesión de uso; para reiniciar
+     * la búsqueda primero debe llamarse a \[stopDiscovery\].
+     \*/
     fun startDiscovery() {
         if (discoveryListener != null) {
             Log.w(TAG, "El descubrimiento ya está activo, se ignora la nueva solicitud")
@@ -176,7 +176,7 @@ class NsdDiscoveryManager(
     /**
      * Detiene la búsqueda de dispositivos y limpia la lista de dispositivos encontrados.
      * Debe llamarse cuando la pantalla que muestra la lista deja de estar visible.
-     */
+     \*/
     fun stopDiscovery() {
         val listener = discoveryListener ?: return
         runCatching {
@@ -189,12 +189,11 @@ class NsdDiscoveryManager(
     }
 
     /**
-     * Resuelve la información de conexión (host, puerto y tipo de dispositivo) de
-     * un servicio encontrado durante el descubrimiento. Si la dirección resuelta
-     * coincide con la IP local de este dispositivo, el resultado se descarta por
-     * tratarse del propio servicio publicado. En caso contrario, se agrega a la
-     * lista observable.
-     */
+     * Resuelve la información de conexión (host, puerto y tipo de dispositivo) de un
+     * servicio encontrado durante el descubrimiento. Si la dirección resuelta coincide
+     * con la IP local de este dispositivo, el resultado se descarta por tratarse del
+     * propio servicio publicado. En caso contrario, se agrega a la lista observable.
+     \*/
     private fun resolveService(serviceInfo: NsdServiceInfo) {
         nsdManager.resolveService(serviceInfo, object : NsdManager.ResolveListener {
             override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
@@ -216,7 +215,7 @@ class NsdDiscoveryManager(
                     serviceName = serviceInfo.serviceName,
                     host = resolvedHost,
                     port = serviceInfo.port,
-                    deviceType = parseDeviceType(serviceInfo)
+                    deviceType = resolveRemoteDeviceType(serviceInfo)
                 )
                 addOrUpdateDevice(device)
             }
@@ -224,24 +223,20 @@ class NsdDiscoveryManager(
     }
 
     /**
-     * Extrae y decodifica el tipo de dispositivo remoto desde el atributo NSD
-     * (TXT record) del servicio resuelto. Si el atributo no está presente o no
-     * es reconocible (por ejemplo, un dispositivo remoto con una versión distinta
-     * de la app), se asume [DeviceType.PHONE] como valor por defecto.
-     */
-    private fun parseDeviceType(serviceInfo: NsdServiceInfo): DeviceType {
-        val rawValue = serviceInfo.attributes[TXT_RECORD_DEVICE_TYPE_KEY]
-            ?.toString(Charsets.UTF_8)
-            ?: return DeviceType.PHONE
-
-        return runCatching { DeviceType.valueOf(rawValue) }
-            .getOrDefault(DeviceType.PHONE)
+     * Lee el tipo de dispositivo anunciado por el servicio remoto desde su registro
+     * TXT. Si el atributo no está presente o no es reconocible, se asume
+     * \[DeviceType.PHONE\] como valor seguro por defecto.
+     \*/
+    private fun resolveRemoteDeviceType(serviceInfo: NsdServiceInfo): DeviceType {
+        val rawValue = serviceInfo.attributes[DEVICE_TYPE_ATTRIBUTE]
+            ?.let { bytes -> String(bytes, Charsets.UTF_8) }
+        return DeviceType.fromSerializedName(rawValue)
     }
 
     /**
-     * Determina si la dirección [candidateHost] corresponde a la propia IP local
+     * Determina si la dirección \[candidateHost\] corresponde a la propia IP local
      * del dispositivo dentro de la red Wi-Fi actual.
-     */
+     \*/
     private fun isLocalDeviceAddress(candidateHost: InetAddress): Boolean {
         val localIpAddress = getLocalIpAddress() ?: return false
         return candidateHost.hostAddress == localIpAddress
@@ -249,8 +244,8 @@ class NsdDiscoveryManager(
 
     /**
      * Obtiene la dirección IP local del dispositivo dentro de la red Wi-Fi actual,
-     * utilizando el [WifiManager] del sistema.
-     */
+     * utilizando el \[WifiManager\] del sistema.
+     \*/
     private fun getLocalIpAddress(): String? {
         return runCatching {
             val wifiManager = context.applicationContext
