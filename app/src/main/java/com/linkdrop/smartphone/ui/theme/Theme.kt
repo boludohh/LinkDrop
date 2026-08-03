@@ -1,70 +1,117 @@
 package com.linkdrop.smartphone.ui.theme
 
 import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.linkdrop.smartphone.settings.ThemeMode
+import com.linkdrop.smartphone.settings.ThemeModeRepository
 
-private val DarkColorScheme =
-    darkColorScheme(primary = Purple80, secondary = PurpleGrey80,
-        tertiary = Pink80)
-
-private val LightColorScheme =
-    lightColorScheme(primary = Purple40, secondary = PurpleGrey40,
-        tertiary = Pink40
-
-        /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+private val LightColors = lightColorScheme(
+    primary = LinkBlueDark,
     onPrimary = Color.White,
+    primaryContainer = Color(0xFFCDE5FF),
+    onPrimaryContainer = Color(0xFF001C3A),
+    secondary = Color(0xFF51606F),
     onSecondary = Color.White,
+    secondaryContainer = Color(0xFFD5E4F6),
+    onSecondaryContainer = Color(0xFF0D1D29),
+    tertiary = LinkGreenDark,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */)
+    tertiaryContainer = Color(0xFFC4F0C7),
+    onTertiaryContainer = Color(0xFF002106),
+    background = LightBackground,
+    onBackground = LightOnSurface,
+    surface = LightBackground,
+    onSurface = LightOnSurface,
+    surfaceVariant = LightCardHigh,
+    onSurfaceVariant = LightOnSurfaceVariant,
+    surfaceContainer = LightCard,
+    surfaceContainerHigh = LightCardHigh,
+    outline = LightOutline,
+    outlineVariant = Color(0xFFC4C6D0),
+    inverseSurface = Color(0xFF2E3033),
+    inverseOnSurface = Color(0xFFEFF0F7),
+    scrim = Color.Black
+)
 
+private val DarkColors = darkColorScheme(
+    primary = LinkBlueLight,
+    onPrimary = Color(0xFF003155),
+    primaryContainer = Color(0xFF00497B),
+    onPrimaryContainer = Color(0xFFCDE5FF),
+    secondary = Color(0xFFB9C8D9),
+    onSecondary = Color(0xFF24323F),
+    secondaryContainer = Color(0xFF3A4856),
+    onSecondaryContainer = Color(0xFFD5E4F6),
+    tertiary = LinkGreenLight,
+    onTertiary = Color(0xFF00390F),
+    tertiaryContainer = Color(0xFF00531C),
+    onTertiaryContainer = Color(0xFFC4F0C7),
+    background = DarkBackground,
+    onBackground = DarkOnSurface,
+    surface = DarkBackground,
+    onSurface = DarkOnSurface,
+    surfaceVariant = DarkCard,
+    onSurfaceVariant = DarkOnSurfaceVariant,
+    surfaceContainer = DarkCard,
+    surfaceContainerHigh = DarkCardHigh,
+    outline = DarkOutline,
+    outlineVariant = Color(0xFF44474E),
+    inverseSurface = DarkOnSurface,
+    inverseOnSurface = Color(0xFF2E3033),
+    scrim = Color.Black
+)
+
+/**
+ * Tema raíz de LinkDrop.
+ *
+ * Resuelve el modo claro/oscuro observando el [ThemeModeRepository]
+ * (claro, oscuro o seguir al sistema) y aplica la paleta fija de marca
+ * correspondiente. También sincroniza las barras del sistema con el
+ * fondo de la aplicación para una apariencia uniforme.
+ \*/
 @Composable
-fun MyComposeApplicationTheme(darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-                              dynamicColor: Boolean = true,
-                              content: @Composable () -> Unit
-) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(
-                context) else dynamicLightColorScheme(context)
-        }
+fun LinkDropTheme(content: @Composable () -> Unit) {
+    val context = LocalContext.current.applicationContext
+    val themeModeRepository = remember(context) { ThemeModeRepository(context) }
+    val themeMode by themeModeRepository.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
 
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    val darkTheme = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
+
+    val colorScheme = if (darkTheme) DarkColors else LightColors
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
-            window.navigationBarColor = colorScheme.primary.toArgb()
-            // WindowCompat.getInsetsController(window,
-            //     view).isAppearanceLightStatusBars = darkTheme
+            window.statusBarColor = colorScheme.background.toArgb()
+            window.navigationBarColor = colorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = !darkTheme
                 isAppearanceLightNavigationBars = !darkTheme
             }
-            window.setBackgroundDrawableResource(android.R.color.transparent)
         }
     }
 
-    MaterialTheme(colorScheme = colorScheme, typography = Typography,
-        content = content)
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = Typography,
+        content = content
+    )
 }
