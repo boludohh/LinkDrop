@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.linkdrop.smartphone.network.NsdDiscoveryManager
 import com.linkdrop.smartphone.network.model.NetworkDevice
 import com.linkdrop.smartphone.network.util.resolveLocalDeviceName
+import com.linkdrop.smartphone.network.util.resolveLocalDeviceType
 import com.linkdrop.smartphone.settings.DeviceNameRepository
 import com.linkdrop.smartphone.transfer.model.TransferProgress
 import com.linkdrop.smartphone.transfer.net.FileReceiverManager
@@ -46,9 +47,6 @@ private const val LOCAL_SERVICE_PORT = 53317
  *
  * Al tocar un dispositivo de la lista se abre el selector de archivos del
  * sistema; el archivo elegido se envía automáticamente a ese dispositivo.
- * Incluye además un campo de texto temporal para validar el guardado del
- * nombre personalizado en DataStore, previo a la existencia de la pantalla
- * de Ajustes definitiva.
  * Sin estilos definitivos: este archivo será reemplazado por completo cuando
  * se implemente la interfaz final de la Home.
  *
@@ -86,11 +84,14 @@ fun DeviceDiscoveryScreen(
         return
     }
 
+    val localDeviceType = remember { resolveLocalDeviceType(context) }
+
     val discoveryManager = remember(resolvedName) {
         NsdDiscoveryManager(
             context = context,
             localDeviceName = resolvedName,
-            localServicePort = LOCAL_SERVICE_PORT
+            localServicePort = LOCAL_SERVICE_PORT,
+            localDeviceType = localDeviceType
         )
     }
 
@@ -152,6 +153,7 @@ fun DeviceDiscoveryScreen(
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
         Text(text = "Dispositivo local: $resolvedName")
+        Text(text = "Tipo detectado (local): $localDeviceType")
 
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -168,7 +170,7 @@ fun DeviceDiscoveryScreen(
         ) {
             items(devices) { device: NetworkDevice ->
                 Text(
-                    text = "${device.serviceName} — ${device.host.hostAddress}:${device.port}",
+                    text = "${device.serviceName} [${device.deviceType}] — ${device.host.hostAddress}:${device.port}",
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 12.dp)
