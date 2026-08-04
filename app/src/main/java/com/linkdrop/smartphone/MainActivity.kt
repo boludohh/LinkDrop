@@ -3,9 +3,11 @@ package com.linkdrop.smartphone
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.view.animation.PathInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.linkdrop.smartphone.settings.LocaleRepository
 import com.linkdrop.smartphone.ui.LinkDropRoot
@@ -17,6 +19,17 @@ import java.util.Locale
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        /** Duración de la animación de salida del splash, en milisegundos. \*/
+        private const val SPLASH_EXIT_ANIMATION_MS = 400L
+    }
+
+    /**
+     * Indica que el splash comenzó su animación de salida, para que el
+     * contenido de la Home inicie su animación de entrada en paralelo.
+     \*/
+    private val splashExiting = mutableStateOf(false)
 
     /** Callback invocado cuando el usuario elige un archivo desde el selector del sistema. \*/
     private var onFilePicked: ((Uri) -> Unit)? = null
@@ -58,13 +71,31 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Debe llamarse antes de super.onCreate para que el sistema muestre
-        // el splash configurado en Theme.App.Starting.
-        installSplashScreen()
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        // Anima la salida del splash con la misma transición que usa la app
+        // entre pantallas (desplazamiento hacia la izquierda con fundido),
+        // mientras el contenido de la Home entra desde la derecha.
+        splashScreen.setOnExitAnimationListener { splashProvider ->
+            splashExiting.value = true
+
+            val splashView = splashProvider.view
+            splashView.animate()
+                .translationXBy(-splashView.width / 3f)
+                .alpha(0f)
+                .setDuration(SPLASH_EXIT_ANIMATION_MS)
+                .setInterpolator(PathInterpolator(0.4f, 0f, 0.2f, 1f))
+                .withEndAction { splashProvider.remove() }
+                .start()
+        }
+
         setContent {
             LinkDropTheme {
-                LinkDropRoot(onPickFile = ::launchFilePicker)
+                LinkDropRoot(
+                    onPickFile = ::launchFilePicker,
+                    splashExiting = splashExiting
+                )
             }
         }
     }
