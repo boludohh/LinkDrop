@@ -2,6 +2,7 @@ package com.linkdrop.smartphone.ui.home
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import com.linkdrop.smartphone.R
 import com.linkdrop.smartphone.network.model.DeviceType
 import com.linkdrop.smartphone.network.model.NetworkDevice
-import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
  * Tarjeta redondeada que representa un dispositivo LinkDrop descubierto en la
@@ -54,26 +55,32 @@ fun DeviceCard(
 
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(28.dp)
+            )
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 21.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(60.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
                     painter = painterResource(deviceIconRes),
                     contentDescription = deviceIconDescription,
-                    modifier = Modifier.size(26.dp),
-                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurfaceVariant)
+                    modifier = Modifier.size(30.dp),
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSecondaryContainer)
                 )
             }
 
@@ -82,7 +89,7 @@ fun DeviceCard(
                     text = device.serviceName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 1f).let { MaterialTheme.colorScheme.onSurface }
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Row(
@@ -108,7 +115,9 @@ fun DeviceCard(
             Image(
                 painter = painterResource(R.drawable.ic_chevron_right),
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier
+                    .padding(end = 4.dp)
+                    .size(28.dp),
                 colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurfaceVariant)
             )
         }

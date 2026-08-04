@@ -17,14 +17,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.linkdrop.smartphone.R
 
 /**
  * Pantalla de Ajustes de LinkDrop.
  *
  * En esta fase se entrega su estructura de navegación (barra superior con
- * regreso y título). El contenido definitivo por secciones se implementa en
- * la Fase 5.
+ * regreso y título, alineada visualmente con la pantalla principal).
+ * El contenido definitivo por secciones se implementa en la Fase 5.
  *
  * @param onBack Callback invocado al tocar la flecha de regreso.
  \*/
@@ -36,9 +37,12 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 20.dp)
+            .padding(vertical = 20.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             IconButton(onClick = onBack) {
                 Image(
                     painter = painterResource(R.drawable.ic_arrow_back),
@@ -51,6 +55,7 @@ fun SettingsScreen(
             Text(
                 text = stringResource(R.string.settings_title),
                 style = MaterialTheme.typography.headlineMedium,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(start = 8.dp)

@@ -60,6 +60,13 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        ndk {
+             abiFilters += listOf(
+                 "armeabi-v7a",
+                 "arm64-v8a"
+             )
+        }
     }
 
     compileOptions {
@@ -134,4 +141,5 @@ dependencies {
 
     implementation(libs.kotlin.stdlib)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.splashscreen)
 }

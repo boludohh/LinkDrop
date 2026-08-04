@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar" />
+
+  <!-- Tema de arranque: muestra el splash nativo (Android 12+) o compat
+       en versiones anteriores, y al terminar cambia a AppTheme. -->
+  <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+    <item name="windowSplashScreenBackground">@color/splash_background</item>
+    <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
+    <item name="postSplashScreenTheme">@style/AppTheme</item>
+  </style>
 </resources>

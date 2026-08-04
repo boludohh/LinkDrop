@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.linkdrop.smartphone.settings.LocaleRepository
 import com.linkdrop.smartphone.ui.LinkDropRoot
 import com.linkdrop.smartphone.ui.theme.LinkDropTheme
@@ -57,6 +58,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Debe llamarse antes de super.onCreate para que el sistema muestre
+        // el splash configurado en Theme.App.Starting.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent {
             LinkDropTheme {

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">LinkDrop</string>
-    <string name="devices_on_network">dispositivos en la red</string>
-    <string name="no_devices_on_network">no hay dispositivos en la red</string>
+    <string name="devices_on_network">Dispositivos disponibles</string>
+    <string name="no_devices_on_network">No hay dispositivos disponibles</string>
     <string name="available">Disponible</string>
     <string name="settings_title">Ajustes</string>
     <string name="cd_open_settings">Abrir ajustes</string>

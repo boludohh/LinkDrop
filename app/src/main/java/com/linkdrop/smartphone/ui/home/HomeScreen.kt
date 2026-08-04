@@ -1,6 +1,7 @@
 package com.linkdrop.smartphone.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.linkdrop.smartphone.R
 import com.linkdrop.smartphone.network.model.NetworkDevice
 import kotlinx.coroutines.flow.StateFlow
@@ -35,7 +37,8 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * Muestra la cabecera con el nombre de la aplicación y el acceso circular a
  * Ajustes, y debajo el estado vacío o la lista de dispositivos que están
- * realmente activos en la red local.
+ * realmente activos en la red local. Las tarjetas de dispositivos se extienden
+ * un poco más hacia los laterales que la cabecera para ganar presencia visual.
  *
  * @param availableDevices Flujo con los dispositivos descubiertos que fueron
  * verificados como activos por el monitor de disponibilidad.
@@ -54,15 +57,18 @@ fun HomeScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 20.dp)
+            .padding(vertical = 20.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.headlineMedium,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f)
@@ -73,13 +79,18 @@ fun HomeScreen(
                     .size(48.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        shape = CircleShape
+                    )
                     .clickable(onClick = onOpenSettings),
                 contentAlignment = Alignment.Center
             ) {
                 androidx.compose.foundation.Image(
                     painter = painterResource(R.drawable.ic_settings),
                     contentDescription = stringResource(R.string.cd_open_settings),
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(26.dp),
                     colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurfaceVariant)
                 )
             }
@@ -91,12 +102,16 @@ fun HomeScreen(
             Text(
                 text = stringResource(R.string.devices_on_network),
                 style = MaterialTheme.typography.bodyLarge,
+                fontSize = 17.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 28.dp, bottom = 12.dp)
+                modifier = Modifier
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 28.dp, bottom = 12.dp)
             )
 
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(15.dp)
             ) {
                 items(devices) { device ->
                     DeviceCard(
