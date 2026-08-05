@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">LinkDrop</string>
+    <string name="app_name">NokliShare</string>
     <string name="devices_on_network">Available devices</string>
     <string name="no_devices_on_network">No available devices</string>
     <string name="available">Available</string>

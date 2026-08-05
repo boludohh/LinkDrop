@@ -30,7 +30,7 @@ val hasValidSigningProps = keystorePropsFile.exists().also { exists ->
 }
 
 android {
-    namespace = "com.linkdrop.smartphone"
+    namespace = "com.noklishare.smartphone"
     compileSdk = 36
 
     lint {
@@ -51,7 +51,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.linkdrop.smartphone"
+        applicationId = "com.noklishare.smartphone"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
