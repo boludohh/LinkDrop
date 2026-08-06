@@ -16,24 +16,19 @@ import java.net.Socket
 
 /**
  * Encargado exclusivo de verificar qué dispositivos descubiertos por NSD están
- * realmente "dentro" de la aplicación LinkDrop, y exponer únicamente esos.
+ * realmente "dentro" de la aplicación NokliShare, y exponer únicamente esos.
  *
- * La verificación se basa en que todo dispositivo con LinkDrop abierto mantiene
- * un socket servidor escuchando en el puerto anunciado. La sonda intenta una
- * conexión TCP breve contra ese puerto:
- * - Si la conexión se establece, el dispositivo está activo y se muestra.
- * - Si la conexión es rechazada o expira, se considera que la aplicación
- *   remota ya no está abierta.
+ * La verificación se basa en que todo dispositivo con NokliShare abierto
+ * mantiene un socket servidor escuchando en el puerto anunciado. La sonda
+ * intenta una conexión TCP breve contra ese puerto:
+ * - Solo cuando una sonda es exitosa el dispositivo se considera verificado y
+ *   se muestra en la lista disponible.
+ * - Si la conexión es rechazada o expira de forma consecutiva, el dispositivo
+ *   deja de considerarse verificado y se retira de la lista.
  *
- * Para evitar parpadeos ante fallos puntuales de red, un dispositivo solo se
- * retira de la lista disponible tras acumular \[MAX_CONSECUTIVE_FAILURES\]
- * fallos consecutivos de sonda, y reaparece en cuanto una sonda vuelve a ser
- * exitosa.
- *
- * Los dispositivos nuevos se muestran en el momento en que NSD los descubre,
- * por lo que la aparición sigue siendo en tiempo real; la sonda periódica se
- * encarga de retirar a los dispositivos cuya aplicación fue cerrada y cuyo
- * servicio NSD quedó residual en la red.
+ * Esto evita mostrar "fantasmas" provenientes de la caché mDNS cuya dirección
+ * ya no responde: un dispositivo nunca aparece sin que su puerto esté vivo, y
+ * desaparece en cuanto deja de estarlo.
  *
  * @param discoveredDevices Lista observable de dispositivos crudos descubiertos
  * por \[NsdDiscoveryManager\].
@@ -56,11 +51,14 @@ class DeviceAvailabilityMonitor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var monitorJob: Job? = null
 
-    /** Protege el acceso a \[consecutiveFailures\] y la publicación de la lista disponible. \*/
+    /** Protege el acceso al estado interno y la publicación de la lista disponible. \*/
     private val lock = Any()
 
     /** Fallos consecutivos de sonda acumulados, indexados por nombre de servicio. \*/
     private val consecutiveFailures = HashMap<String, Int>()
+
+    /** Servicios cuya sonda fue exitosa al menos una vez y siguen vivos. \*/
+    private val verifiedDevices = HashSet<String>()
 
     private val _availableDevices = MutableStateFlow<List<NetworkDevice>>(emptyList())
 
@@ -100,28 +98,27 @@ class DeviceAvailabilityMonitor(
 
         synchronized(lock) {
             consecutiveFailures.clear()
+            verifiedDevices.clear()
         }
         _availableDevices.value = emptyList()
     }
 
     /**
-     * Publica la lista de dispositivos actualmente utilizables: todos los
-     * descubiertos por NSD que no hayan acumulado suficientes fallos de sonda
-     * consecutivos como para considerarse caídos.
+     * Publica la lista de dispositivos actualmente utilizables: únicamente los
+     * descubiertos por NSD que fueron verificados como vivos por una sonda.
      \*/
     private fun refreshAvailableDevices() {
         synchronized(lock) {
             val discovered = discoveredDevices.value
             _availableDevices.value = discovered.filter { device ->
-                val failures = consecutiveFailures[device.serviceName] ?: 0
-                failures < MAX_CONSECUTIVE_FAILURES
+                device.serviceName in verifiedDevices
             }
         }
     }
 
     /**
      * Ejecuta una ronda completa de sondas sobre los dispositivos descubiertos
-     * y actualiza el conteo de fallos consecutivos de cada uno.
+     * y actualiza el conjunto de dispositivos verificados.
      \*/
     private fun probeDiscoveredDevices() {
         val discovered = discoveredDevices.value
@@ -134,17 +131,25 @@ class DeviceAvailabilityMonitor(
 
         synchronized(lock) {
             for ((device, reachable) in probeResults) {
+                val name = device.serviceName
                 if (reachable) {
-                    consecutiveFailures.remove(device.serviceName)
+                    consecutiveFailures.remove(name)
+                    verifiedDevices.add(name)
                 } else {
-                    val failures = consecutiveFailures[device.serviceName] ?: 0
-                    consecutiveFailures[device.serviceName] = failures + 1
+                    val failures = (consecutiveFailures[name] ?: 0) + 1
+                    if (failures >= MAX_CONSECUTIVE_FAILURES) {
+                        consecutiveFailures.remove(name)
+                        verifiedDevices.remove(name)
+                    } else {
+                        consecutiveFailures[name] = failures
+                    }
                 }
             }
 
             // Descarta el seguimiento de dispositivos que ya no están descubiertos.
             val discoveredNames = discovered.mapTo(HashSet<String>()) { it.serviceName }
             consecutiveFailures.keys.retainAll(discoveredNames)
+            verifiedDevices.retainAll(discoveredNames)
         }
 
         refreshAvailableDevices()
@@ -153,7 +158,7 @@ class DeviceAvailabilityMonitor(
     /**
      * Intenta una conexión TCP breve contra el puerto anunciado por \[device\].
      * Devuelve \`true\` si la conexión se establece, lo que indica que la
-     * aplicación LinkDrop remota está abierta y escuchando.
+     * aplicación NokliShare remota está abierta y escuchando.
      \*/
     private fun probeDevice(device: NetworkDevice): Boolean {
         return runCatching {

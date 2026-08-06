@@ -10,4 +10,14 @@
     <string name="device_type_phone">Teléfono</string>
     <string name="device_type_tablet">Tablet</string>
     <string name="device_type_tv">TV</string>
+    <string name="sending_to">Enviando a %1$s</string>
+    <string name="receiving_from">Recibiendo de %1$s</string>
+    <string name="transfer_completed">Transferencia completada</string>
+    <string name="transfer_failed">Transferencia fallida</string>
+    <string name="incoming_transfer">Transferencia entrante</string>
+    <string name="incoming_transfer_description">%1$s quiere enviarte un archivo</string>
+    <string name="accept">Aceptar</string>
+    <string name="reject">Rechazar</string>
+    <string name="dismiss">Descartar</string>
+    <string name="file_exceeds_limit">El archivo supera el límite de 10 GB</string>
 </resources>

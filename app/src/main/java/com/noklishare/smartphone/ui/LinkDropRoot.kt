@@ -35,6 +35,7 @@ import com.noklishare.smartphone.network.util.resolveLocalDeviceType
 import com.noklishare.smartphone.settings.DeviceNameRepository
 import com.noklishare.smartphone.transfer.net.FileReceiverManager
 import com.noklishare.smartphone.transfer.net.FileSenderManager
+import com.noklishare.smartphone.transfer.net.IncomingTransferCoordinator
 import com.noklishare.smartphone.ui.home.HomeScreen
 import com.noklishare.smartphone.ui.settings.SettingsScreen
 import kotlinx.coroutines.delay
@@ -151,8 +152,16 @@ fun LinkDropRoot(
                     FileSenderManager(context = context, localDeviceName = resolvedName)
                 }
 
+                val incomingTransferCoordinator = remember { IncomingTransferCoordinator() }
+
                 val receiverManager = remember {
-                    FileReceiverManager(context = context, listenPort = LOCAL_SERVICE_PORT)
+                    FileReceiverManager(
+                        context = context,
+                        listenPort = LOCAL_SERVICE_PORT,
+                        onIncomingFileRequest = { remoteDeviceName, fileName ->
+                            incomingTransferCoordinator.awaitUserDecision(remoteDeviceName, fileName)
+                        }
+                    )
                 }
 
                 val availabilityMonitor = remember(discoveryManager) {
@@ -235,12 +244,19 @@ fun LinkDropRoot(
                     } else {
                         HomeScreen(
                             availableDevices = availabilityMonitor.availableDevices,
+                            senderProgress = senderManager.transferProgress,
+                            receiverProgress = receiverManager.transferProgress,
+                            incomingRequest = incomingTransferCoordinator.pendingRequest,
                             onDeviceClick = { device: NetworkDevice ->
                                 onPickFile { pickedUri ->
                                     senderManager.sendFile(pickedUri, device)
                                 }
                             },
-                            onOpenSettings = { showingSettings = true }
+                            onOpenSettings = { showingSettings = true },
+                            onAcceptIncoming = { incomingTransferCoordinator.accept() },
+                            onRejectIncoming = { incomingTransferCoordinator.reject() },
+                            onDismissSenderTransfer = { senderManager.dismissTransfer() },
+                            onDismissReceiverTransfer = { receiverManager.dismissTransfer() }
                         )
                     }
                 }

@@ -1,13 +1,18 @@
 package com.noklishare.smartphone
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.animation.PathInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.noklishare.smartphone.settings.LocaleRepository
 import com.noklishare.smartphone.ui.LinkDropRoot
@@ -21,6 +26,8 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
 
     companion object {
+        private const val TAG = "MainActivity"
+
         /** Duración de la animación de salida del splash, en milisegundos. \*/
         private const val SPLASH_EXIT_ANIMATION_MS = 400L
     }
@@ -41,6 +48,20 @@ class MainActivity : ComponentActivity() {
             onFilePicked?.invoke(uri)
         }
         onFilePicked = null
+    }
+
+    /** Resultado de la solicitud del permiso de almacenamiento en Android 8/9. \*/
+    private val storagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            Log.i(TAG, "Permiso de almacenamiento concedido")
+        } else {
+            Log.w(
+                TAG,
+                "Permiso de almacenamiento denegado; la recepción de archivos fallará en este dispositivo"
+            )
+        }
     }
 
     /**
@@ -90,6 +111,8 @@ class MainActivity : ComponentActivity() {
                 .start()
         }
 
+        requestLegacyStoragePermissionIfNeeded()
+
         setContent {
             LinkDropTheme {
                 LinkDropRoot(
@@ -97,6 +120,22 @@ class MainActivity : ComponentActivity() {
                     splashExiting = splashExiting
                 )
             }
+        }
+    }
+
+    /**
+     * En Android 8/9 (API 28 y anteriores) escribir en la carpeta pública de
+     * Descargas requiere el permiso de almacenamiento en tiempo de ejecución;
+     * se solicita una vez al arrancar. En Android 10+ no es necesario.
+     \*/
+    private fun requestLegacyStoragePermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT <= 28 &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
 }
