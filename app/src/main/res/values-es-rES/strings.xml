@@ -20,4 +20,5 @@
     <string name="reject">Rechazar</string>
     <string name="dismiss">Descartar</string>
     <string name="file_exceeds_limit">El archivo supera el límite de 10 GB</string>
+    <string name="confirmation_timeout">Se agotó el tiempo de confirmación</string>
 </resources>

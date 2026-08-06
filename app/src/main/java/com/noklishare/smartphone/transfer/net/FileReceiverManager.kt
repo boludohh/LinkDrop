@@ -3,6 +3,7 @@ package com.noklishare.smartphone.transfer.net
 import android.content.Context
 import android.util.Log
 import com.noklishare.smartphone.R
+import com.noklishare.smartphone.transfer.model.IncomingDecision
 import com.noklishare.smartphone.transfer.model.TransferDirection
 import com.noklishare.smartphone.transfer.model.TransferLimits
 import com.noklishare.smartphone.transfer.model.TransferProgress
@@ -38,8 +39,10 @@ import java.net.Socket
  *
  * Al recibir una conexión, lee primero un pequeño encabezado con el nombre
  * del dispositivo remoto, el nombre del archivo y su tamaño en bytes, y
- * consulta \[onIncomingFileRequest\] para decidir si aceptar o rechazar la
- * transferencia antes de recibir ningún byte del archivo. Los archivos que
+ * consulta \[onIncomingFileRequest\] para decidir si aceptar, rechazar o
+ * dejar expirar la transferencia antes de recibir ningún byte del archivo.
+ * La decisión se comunica al emisor como un código numérico (1 = aceptar,
+ * 0 = rechazar, 2 = tiempo de confirmación agotado). Los archivos que
  * superan el límite de \[TransferLimits.MAX_FILE_SIZE_BYTES\] se rechazan
  * automáticamente como red de seguridad. Si se acepta, escribe el contenido
  * recibido mediante \[NokliShareFileStorage\] y, al terminar, envía un acuse
@@ -52,14 +55,14 @@ import java.net.Socket
  * @param context Contexto de la aplicación, usado para acceder al almacenamiento de destino.
  * @param listenPort Puerto TCP en el que este dispositivo escuchará conexiones entrantes.
  * @param onIncomingFileRequest Función invocada por cada archivo entrante para decidir
- * si se acepta o se rechaza, recibiendo el nombre del
+ * si se acepta, se rechaza o expira, recibiendo el nombre del
  * dispositivo remoto y el nombre del archivo propuesto.
- * Devuelve \`true\` para aceptar la transferencia.
+ * Devuelve la decisión resultante.
  \*/
 class FileReceiverManager(
     private val context: Context,
     private val listenPort: Int,
-    private val onIncomingFileRequest: suspend (remoteDeviceName: String, fileName: String) -> Boolean = { _, _ -> true }
+    private val onIncomingFileRequest: suspend (remoteDeviceName: String, fileName: String) -> IncomingDecision = { _, _ -> IncomingDecision.ACCEPT }
 ) {
 
     companion object {
@@ -73,6 +76,15 @@ class FileReceiverManager(
 
         /** Espera antes de reiniciar el servidor tras un fallo inesperado, en ms. \*/
         private const val RESTART_DELAY_MS = 1000L
+
+        /** Código de decisión enviado al emisor cuando la transferencia se acepta. \*/
+        private const val DECISION_ACCEPTED = 1
+
+        /** Código de decisión enviado al emisor cuando la transferencia se rechaza. \*/
+        private const val DECISION_REJECTED = 0
+
+        /** Código de decisión enviado al emisor cuando el tiempo de confirmación se agota. \*/
+        private const val DECISION_TIMEOUT = 2
     }
 
     private val fileStorage = NokliShareFileStorage(context)
@@ -165,11 +177,12 @@ class FileReceiverManager(
      * metadatos del archivo, rechaza automáticamente los archivos que superan
      * el límite de tamaño, intenta reservar el bloqueo de transferencia (si ya
      * hay otra en curso o pendiente, rechaza de inmediato informando al
-     * emisor), consulta \[onIncomingFileRequest\] para decidir si aceptar,
-     * responde esa decisión al emisor, y en caso afirmativo recibe el
-     * contenido del archivo escribiéndolo en el almacenamiento de destino
-     * mientras reporta el progreso. Al finalizar, envía el acuse final de
-     * guardado (\`true\`/\`false\`) para que el emisor conozca el resultado real.
+     * emisor), consulta \[onIncomingFileRequest\] para obtener la decisión
+     * (aceptar, rechazar o tiempo agotado), responde esa decisión al emisor,
+     * y en caso afirmativo recibe el contenido del archivo escribiéndolo en el
+     * almacenamiento de destino mientras reporta el progreso. Al finalizar,
+     * envía el acuse final de guardado (\`true\`/\`false\`) para que el emisor
+     * conozca el resultado real.
      *
      * Esta función es \`suspend\` porque \[onIncomingFileRequest\] puede
      * necesitar esperar una interacción del usuario (por ejemplo, tocar un
@@ -208,7 +221,7 @@ class FileReceiverManager(
             if (fileSize > TransferLimits.MAX_FILE_SIZE_BYTES) {
                 Log.w(TAG, "Transferencia de '$fileName' rechazada: supera el límite de tamaño permitido")
                 runCatching {
-                    output.writeBoolean(false)
+                    output.writeInt(DECISION_REJECTED)
                     output.flush()
                 }
                 _transferProgress.value = TransferProgress.Failed(
@@ -224,28 +237,39 @@ class FileReceiverManager(
             if (!transferLock.tryLock()) {
                 Log.w(TAG, "Transferencia de '$fileName' rechazada: ya hay una transferencia en curso o pendiente")
                 runCatching {
-                    output.writeBoolean(false)
+                    output.writeInt(DECISION_REJECTED)
                     output.flush()
                 }
                 return
             }
 
             try {
-                // La consulta de aceptación queda fuera de runCatching porque es
+                // La consulta de decisión queda fuera de runCatching porque es
                 // una función suspend y runCatching no admite lambdas suspend.
-                val isAccepted = onIncomingFileRequest(remoteDeviceName, fileName)
+                val decision = onIncomingFileRequest(remoteDeviceName, fileName)
 
                 runCatching {
-                    output.writeBoolean(isAccepted)
+                    output.writeInt(decisionToWireCode(decision))
                     output.flush()
                 }.onFailure { error ->
                     Log.e(TAG, "Error al responder la confirmación al emisor", error)
                     return
                 }
 
-                if (!isAccepted) {
-                    Log.i(TAG, "Transferencia de '$fileName' rechazada")
-                    return
+                when (decision) {
+                    IncomingDecision.REJECT -> {
+                        Log.i(TAG, "Transferencia de '$fileName' rechazada")
+                        return
+                    }
+                    IncomingDecision.TIMEOUT -> {
+                        Log.w(TAG, "Transferencia de '$fileName' expirada: se agotó el tiempo de confirmación")
+                        _transferProgress.value = TransferProgress.Failed(
+                            fileName = fileName,
+                            reason = context.getString(R.string.confirmation_timeout)
+                        )
+                        return
+                    }
+                    IncomingDecision.ACCEPT -> Unit
                 }
 
                 val speedTracker = SpeedTracker()
@@ -320,6 +344,15 @@ class FileReceiverManager(
             } finally {
                 transferLock.unlock()
             }
+        }
+    }
+
+    /** Convierte la decisión local en el código numérico que viaja al emisor. \*/
+    private fun decisionToWireCode(decision: IncomingDecision): Int {
+        return when (decision) {
+            IncomingDecision.ACCEPT -> DECISION_ACCEPTED
+            IncomingDecision.REJECT -> DECISION_REJECTED
+            IncomingDecision.TIMEOUT -> DECISION_TIMEOUT
         }
     }
 }

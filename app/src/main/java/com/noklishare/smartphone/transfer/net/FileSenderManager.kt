@@ -4,8 +4,10 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
+import com.noklishare.smartphone.R
 import com.noklishare.smartphone.network.model.NetworkDevice
 import com.noklishare.smartphone.transfer.model.TransferDirection
+import com.noklishare.smartphone.transfer.model.TransferLimits
 import com.noklishare.smartphone.transfer.model.TransferProgress
 import com.noklishare.smartphone.transfer.util.SpeedTracker
 import kotlinx.coroutines.CoroutineScope
@@ -27,12 +29,17 @@ import java.net.Socket
  *
  * Se conecta al \[NetworkDevice\] destino, envía primero un pequeño encabezado
  * con el nombre de este dispositivo, el nombre del archivo y su tamaño en
- * bytes, y espera la confirmación del receptor antes de transmitir el
- * contenido. Tras enviar todos los bytes, espera además un acuse final del
+ * bytes, y espera la decisión del receptor (aceptar, rechazar o tiempo de
+ * confirmación agotado, comunicada como código numérico) antes de transmitir
+ * el contenido. Tras enviar todos los bytes, espera además un acuse final del
  * receptor que confirma que el archivo se guardó correctamente; si el receptor
  * no pudo guardarlo, la transferencia se marca como fallida. Si el receptor
- * rechaza la transferencia (o no responde), la operación finaliza con
- * \[TransferProgress.Failed\] sin enviar ningún byte del archivo.
+ * rechaza la transferencia, deja expirar la confirmación o no responde, la
+ * operación finaliza con \[TransferProgress.Failed\] sin enviar ningún byte
+ * del archivo.
+ *
+ * Los archivos que superan el límite de \[TransferLimits.MAX_FILE_SIZE_BYTES\]
+ * se rechazan en origen antes de conectar, con un mensaje claro para el usuario.
  *
  * Esta clase no realiza descubrimiento de dispositivos ni recibe archivos:
  * esas responsabilidades corresponden a \[com.noklishare.smartphone.network.NsdDiscoveryManager\]
@@ -55,11 +62,17 @@ class FileSenderManager(
         /** Tiempo máximo de espera al intentar establecer la conexión, en milisegundos. \*/
         private const val CONNECT_TIMEOUT_MS = 10_000
 
-        /** Tiempo máximo de espera de la confirmación del receptor, en milisegundos. \*/
+        /** Tiempo máximo de espera de la decisión del receptor, en milisegundos. \*/
         private const val ACCEPT_TIMEOUT_MS = 20_000
 
         /** Tiempo máximo de espera del acuse final de guardado, en milisegundos. \*/
         private const val FINAL_ACK_TIMEOUT_MS = 20_000
+
+        /** Código de decisión recibido del emisor cuando la transferencia se acepta. \*/
+        private const val DECISION_ACCEPTED = 1
+
+        /** Código de decisión recibido del emisor cuando el tiempo de confirmación se agota. \*/
+        private const val DECISION_TIMEOUT = 2
     }
 
     private val scope = CoroutineScope(Dispatchers.IO)
@@ -72,7 +85,9 @@ class FileSenderManager(
     /**
      * Envía el archivo indicado por \[fileUri\] al dispositivo \[targetDevice\].
      * La operación se ejecuta de forma asíncrona; el progreso puede observarse
-     * a través de \[transferProgress\].
+     * a través de \[transferProgress\]. Si el archivo supera el límite de
+     * tamaño permitido, la transferencia se marca como fallida sin intentar
+     * la conexión.
      *
      * @param fileUri Uri del archivo seleccionado por el usuario, obtenido desde
      * el selector de documentos del sistema.
@@ -82,6 +97,15 @@ class FileSenderManager(
         scope.launch {
             runCatching {
                 val (fileName, fileSize) = resolveFileMetadata(fileUri)
+
+                if (fileSize > TransferLimits.MAX_FILE_SIZE_BYTES) {
+                    _transferProgress.value = TransferProgress.Failed(
+                        fileName = fileName,
+                        reason = context.getString(R.string.file_exceeds_limit)
+                    )
+                    return@launch
+                }
+
                 val speedTracker = SpeedTracker()
 
                 _transferProgress.value = TransferProgress.InProgress(
@@ -106,14 +130,17 @@ class FileSenderManager(
 
                     val input = DataInputStream(BufferedInputStream(socket.getInputStream()))
 
-                    // Espera acotada de la confirmación del receptor: si el destino
+                    // Espera acotada de la decisión del receptor: si el destino
                     // quedara colgado sin responder, el envío falla limpiamente en
                     // lugar de quedarse bloqueado para siempre.
                     socket.soTimeout = ACCEPT_TIMEOUT_MS
-                    val wasAccepted = input.readBoolean()
+                    val decisionCode = input.readInt()
                     socket.soTimeout = 0
 
-                    if (!wasAccepted) {
+                    if (decisionCode == DECISION_TIMEOUT) {
+                        throw IllegalStateException(context.getString(R.string.confirmation_timeout))
+                    }
+                    if (decisionCode != DECISION_ACCEPTED) {
                         throw IllegalStateException("El destinatario rechazó la transferencia")
                     }
 

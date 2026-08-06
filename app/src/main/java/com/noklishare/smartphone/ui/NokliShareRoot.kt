@@ -247,6 +247,7 @@ fun NokliShareRoot(
                             senderProgress = senderManager.transferProgress,
                             receiverProgress = receiverManager.transferProgress,
                             incomingRequest = incomingTransferCoordinator.pendingRequest,
+                            confirmationRemainingSeconds = incomingTransferCoordinator.remainingSeconds,
                             onDeviceClick = { device: NetworkDevice ->
                                 onPickFile { pickedUri ->
                                     senderManager.sendFile(pickedUri, device)

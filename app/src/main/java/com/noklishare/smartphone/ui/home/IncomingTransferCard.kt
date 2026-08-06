@@ -31,15 +31,18 @@ import com.noklishare.smartphone.transfer.model.IncomingTransferRequest
 
 /**
  * Tarjeta de solicitud de transferencia entrante: muestra quién quiere enviar
- * un archivo y su nombre, con acciones para aceptar o rechazar.
+ * un archivo y su nombre, la cuenta regresiva del tiempo de confirmación
+ * (15 → 0 segundos), y acciones para aceptar o rechazar.
  *
  * @param request Solicitud pendiente de confirmación.
+ * @param remainingSeconds Segundos restantes antes de que expire la confirmación.
  * @param onAccept Callback invocado al aceptar la transferencia.
  * @param onReject Callback invocado al rechazar la transferencia.
  \*/
 @Composable
 fun IncomingTransferCard(
     request: IncomingTransferRequest,
+    remainingSeconds: Int,
     onAccept: () -> Unit,
     onReject: () -> Unit,
     modifier: Modifier = Modifier
@@ -95,6 +98,18 @@ fun IncomingTransferCard(
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
+
+                Text(
+                    text = "$remainingSeconds s",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (remainingSeconds <= 5) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.padding(start = 8.dp)
+                )
             }
 
             Row(

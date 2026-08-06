@@ -46,14 +46,15 @@ private const val CARD_ANIMATION_MS = 300
  * Pantalla principal de NokliShare.
  *
  * Muestra la cabecera con el nombre de la aplicación y el acceso circular a
- * Ajustes; debajo, las tarjetas dinámicas de solicitud entrante y de
- * transferencias en curso/finalizadas, y finalmente el estado vacío o la
- * lista de dispositivos activos en la red local.
+ * Ajustes; debajo, las tarjetas dinámicas de solicitud entrante (con su cuenta
+ * regresiva de confirmación) y de transferencias en curso/finalizadas, y
+ * finalmente el estado vacío o la lista de dispositivos activos en la red local.
  *
  * @param availableDevices Flujo con los dispositivos descubiertos verificados como activos.
  * @param senderProgress Flujo con el estado de la transferencia de envío.
  * @param receiverProgress Flujo con el estado de la transferencia de recepción.
  * @param incomingRequest Flujo con la solicitud entrante pendiente, si la hay.
+ * @param confirmationRemainingSeconds Flujo con los segundos restantes de confirmación.
  * @param onDeviceClick Callback invocado al tocar una tarjeta de dispositivo.
  * @param onOpenSettings Callback invocado al tocar el botón circular de Ajustes.
  * @param onAcceptIncoming Callback invocado al aceptar una transferencia entrante.
@@ -67,6 +68,7 @@ fun HomeScreen(
     senderProgress: StateFlow<TransferProgress>,
     receiverProgress: StateFlow<TransferProgress>,
     incomingRequest: StateFlow<IncomingTransferRequest?>,
+    confirmationRemainingSeconds: StateFlow<Int>,
     onDeviceClick: (NetworkDevice) -> Unit,
     onOpenSettings: () -> Unit,
     onAcceptIncoming: () -> Unit,
@@ -79,6 +81,7 @@ fun HomeScreen(
     val senderState by senderProgress.collectAsState()
     val receiverState by receiverProgress.collectAsState()
     val request by incomingRequest.collectAsState()
+    val remainingSeconds by confirmationRemainingSeconds.collectAsState()
 
     Column(
         modifier = modifier
@@ -127,6 +130,7 @@ fun HomeScreen(
             if (currentRequest != null) {
                 IncomingTransferCard(
                     request = currentRequest,
+                    remainingSeconds = remainingSeconds,
                     onAccept = onAcceptIncoming,
                     onReject = onRejectIncoming,
                     modifier = Modifier.padding(top = 16.dp)
