@@ -27,10 +27,10 @@ import java.io.OutputStream
  * Esta clase no maneja sockets ni lógica de red: su única responsabilidad es
  * la escritura del archivo en el almacenamiento del dispositivo.
  \*/
-class LinkDropFileStorage(private val context: Context) {
+class NokliShareFileStorage(private val context: Context) {
 
     companion object {
-        private const val TAG = "LinkDropFileStorage"
+        private const val TAG = "NokliShareFileStorage"
 
         /** Subcarpeta fija dentro de Descargas donde se guardan todos los archivos recibidos. \*/
         private const val NOKLISHARE_SUBFOLDER = "NokliShare"

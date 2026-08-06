@@ -79,7 +79,7 @@ private const val SPLASH_ENTER_FALLBACK_MS = 1000L
  * su animación de salida, para disparar la entrada animada de la Home.
  \*/
 @Composable
-fun LinkDropRoot(
+fun NokliShareRoot(
     onPickFile: (onPicked: (Uri) -> Unit) -> Unit,
     splashExiting: State<Boolean>
 ) {
@@ -236,7 +236,7 @@ fun LinkDropRoot(
                             ))
                         }
                     },
-                    label = "LinkDropMainNavigation",
+                    label = "NokliShareMainNavigation",
                     modifier = Modifier.fillMaxSize()
                 ) { target ->
                     if (target) {

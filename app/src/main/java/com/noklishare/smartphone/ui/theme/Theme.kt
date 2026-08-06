@@ -75,7 +75,7 @@ private val DarkColors = darkColorScheme(
 )
 
 /**
- * Tema raíz de LinkDrop.
+ * Tema raíz de NokliShare.
  *
  * Resuelve el modo claro/oscuro observando el [ThemeModeRepository]
  * (claro, oscuro o seguir al sistema) y aplica la paleta fija de marca
@@ -83,7 +83,7 @@ private val DarkColors = darkColorScheme(
  * fondo de la aplicación para una apariencia uniforme.
  \*/
 @Composable
-fun LinkDropTheme(content: @Composable () -> Unit) {
+fun NokliShareTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current.applicationContext
     val themeModeRepository = remember(context) { ThemeModeRepository(context) }
     val themeMode by themeModeRepository.themeMode.collectAsState(initial = ThemeMode.SYSTEM)

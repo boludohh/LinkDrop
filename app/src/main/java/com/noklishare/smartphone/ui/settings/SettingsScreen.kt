@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.noklishare.smartphone.R
 
 /**
- * Pantalla de Ajustes de LinkDrop.
+ * Pantalla de Ajustes de NokliShare.
  *
  * En esta fase se entrega su estructura de navegación (barra superior con
  * regreso y título, alineada visualmente con la pantalla principal).

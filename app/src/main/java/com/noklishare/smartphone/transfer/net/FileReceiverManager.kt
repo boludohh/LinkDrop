@@ -6,7 +6,7 @@ import com.noklishare.smartphone.R
 import com.noklishare.smartphone.transfer.model.TransferDirection
 import com.noklishare.smartphone.transfer.model.TransferLimits
 import com.noklishare.smartphone.transfer.model.TransferProgress
-import com.noklishare.smartphone.transfer.storage.LinkDropFileStorage
+import com.noklishare.smartphone.transfer.storage.NokliShareFileStorage
 import com.noklishare.smartphone.transfer.util.SpeedTracker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +42,7 @@ import java.net.Socket
  * transferencia antes de recibir ningún byte del archivo. Los archivos que
  * superan el límite de \[TransferLimits.MAX_FILE_SIZE_BYTES\] se rechazan
  * automáticamente como red de seguridad. Si se acepta, escribe el contenido
- * recibido mediante \[LinkDropFileStorage\] y, al terminar, envía un acuse
+ * recibido mediante \[NokliShareFileStorage\] y, al terminar, envía un acuse
  * final al emisor indicando si el archivo se guardó correctamente.
  *
  * Esta clase no realiza descubrimiento de dispositivos ni envía archivos:
@@ -75,7 +75,7 @@ class FileReceiverManager(
         private const val RESTART_DELAY_MS = 1000L
     }
 
-    private val fileStorage = LinkDropFileStorage(context)
+    private val fileStorage = NokliShareFileStorage(context)
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private var listeningJob: Job? = null

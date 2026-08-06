@@ -15,8 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.noklishare.smartphone.settings.LocaleRepository
-import com.noklishare.smartphone.ui.LinkDropRoot
-import com.noklishare.smartphone.ui.theme.LinkDropTheme
+import com.noklishare.smartphone.ui.NokliShareRoot
+import com.noklishare.smartphone.ui.theme.NokliShareTheme
 import com.noklishare.smartphone.util.applyAppLocale
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -114,8 +114,8 @@ class MainActivity : ComponentActivity() {
         requestLegacyStoragePermissionIfNeeded()
 
         setContent {
-            LinkDropTheme {
-                LinkDropRoot(
+            NokliShareTheme {
+                NokliShareRoot(
                     onPickFile = ::launchFilePicker,
                     splashExiting = splashExiting
                 )
